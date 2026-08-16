@@ -1,0 +1,22 @@
+---
+description: ESP32 dorm desktop UI contract — read before firmware/UI changes
+alwaysApply: true
+---
+
+# supermini desktop_device
+
+Before changing anything under `desktop_device/`, **read and follow** [`desktop_device/UI_CONTRACT.md`](desktop_device/UI_CONTRACT.md).
+
+Enforce especially:
+
+- No full-screen wipe + line-by-line redraw flicker; use frame canvas or opaque glyph updates
+- No double-repaint on module enter
+- Buttons (module): K3 next module, K4 prev module (hold K4 3s standby), K1 next page, K2 prev page; Clock K2 menu, Clock K1 weather refresh
+- Buttons (menu): K4 up, K3 down, K1 confirm, K2 back
+- Settings: Weather Auto/Manual, Images On/Off, Hypixel On/Off
+- Status bar: WiFi · key · `#N` · `update:HH:MM` (no module title)
+- Weather schedule 05:45/08:00/10:00/21:00/23:00 always; Auto +10min; Hypixel On = 45s
+- Module #-1 Help, #0 Images, #1 Clock, #2 Forecast, #3 Hypixel
+- Clock: umbrella/hat icons under weather glyph; sunrise line kept
+- Forecast pages: daily -2, then -1, then hourly; **default open -1**
+- Device fetches only companion hub APIs

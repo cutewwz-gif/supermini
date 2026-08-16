@@ -1,0 +1,17 @@
+[Unit]
+Description=SuperMini image host API
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/supermini
+ExecStart=/supermini/.venv/bin/uvicorn app:app --host 127.0.0.1 --port 18765 --proxy-headers --workers 1 --limit-concurrency 8
+Restart=always
+RestartSec=5
+User=root
+Environment=PYTHONUNBUFFERED=1
+MemoryMax=180M
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target

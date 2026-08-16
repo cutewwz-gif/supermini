@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SuperMini · Hypixel</title>
+  <style>
+    :root {
+      --bg0: #0e1412; --bg1: #17201c; --ink: #e8f0ea; --muted: #8aa094;
+      --accent: #3ecf8e; --line: #2a3a33; --danger: #e85d5d; --aqua: #55ffff; --green: #55ff55;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; color: var(--ink);
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background:
+        radial-gradient(800px 420px at 10% -10%, #1c3a2e 0%, transparent 55%),
+        linear-gradient(160deg, var(--bg0), var(--bg1));
+    }
+    main { max-width: 720px; margin: 0 auto; padding: 36px 18px 80px; }
+    h1 { margin: 0 0 6px; font-size: clamp(1.6rem, 4vw, 2.2rem); }
+    .sub { color: var(--muted); margin-bottom: 22px; line-height: 1.5; }
+    a { color: var(--accent); }
+    .panel {
+      border: 1px solid var(--line); background: rgba(10,16,14,.55);
+      padding: 18px; margin-bottom: 18px;
+    }
+    label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 6px; }
+    input {
+      width: 100%; padding: 10px 12px; border: 1px solid var(--line);
+      background: #0a100e; color: var(--ink); font-size: 15px;
+    }
+    button {
+      appearance: none; border: 0; background: var(--accent); color: #062016;
+      font-weight: 700; padding: 10px 16px; cursor: pointer; margin-top: 14px; margin-right: 8px;
+    }
+    button.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+    .status { margin-top: 10px; min-height: 1.3em; color: var(--muted); font-size: 13px; }
+    .preview-name { font-size: 1.25rem; margin: 8px 0; letter-spacing: .02em; }
+    .seg { font-weight: 700; }
+    .meta { color: var(--muted); font-size: 13px; line-height: 1.6; }
+    code { color: var(--accent); }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; font-size: 14px; }
+    @media (max-width: 560px) { .grid2 { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Hypixel</h1>
+    <p class="sub">
+      配置 API Key 与玩家名（Key 约 3 天失效，在此更新即可）。<br/>
+      设备接口：<code>GET /supermini/api/hypixel</code>
+      · <a href="/supermini/">← 图床</a><br/>
+      若 hub 所在网络无法直连 api.hypixel.net，可通过环境变量 <code>HYPIXEL_EDGE_URL</code> 走可达 Cloudflare 的中继。
+      保存 Key 后点「仅刷新」即可。
+    </p>
+
+    <section class="panel">
+      <label>Minecraft 用户名</label>
+      <input id="username" autocomplete="off" placeholder="例如你的 ID（不要写死，随时可改）" />
+      <label>Hypixel API Key</label>
+      <input id="apiKey" type="password" autocomplete="off" placeholder="粘贴新 Key（留空则保留已保存的）" />
+      <div>
+        <button type="button" id="save">保存并刷新</button>
+        <button type="button" class="ghost" id="refresh">仅刷新数据</button>
+      </div>
+      <div class="status" id="status"></div>
+      <div class="meta" id="cfgMeta"></div>
+    </section>
+
+    <section class="panel">
+      <h2 style="margin:0 0 8px;font-size:1.05rem;">预览（设备同款字段）</h2>
+      <div class="preview-name" id="rankLine">—</div>
+      <div class="meta" id="onlineLine">—</div>
+      <div class="grid2" id="stats" style="margin-top:12px;"></div>
+    </section>
+  </main>
+  <script>
+    const COLORS = {
+      black:'#000', dark_blue:'#00a', dark_green:'#0a0', dark_aqua:'#0aa',
+      dark_red:'#a00', dark_purple:'#a0a', gold:'#fa0', gray:'#aaa',
+      dark_gray:'#555', blue:'#55f', green:'#5f5', aqua:'#5ff',
+      red:'#f55', light_purple:'#f5f', yellow:'#ff5', white:'#fff'
+    };
+
+    const statusEl = document.getElementById('status');
+    function setStatus(t) { statusEl.textContent = t || ''; }
+
+    function paintSummary(s) {
+      const rankLine = document.getElementById('rankLine');
+      const onlineLine = document.getElementById('onlineLine');
+      const stats = document.getElementById('stats');
+      if (!s || !s.ok) {
+        rankLine.textContent = '—';
+        onlineLine.textContent = (s && s.error) ? ('错误: ' + s.error) : '暂无数据';
+        stats.innerHTML = '';
+        return;
+      }
+      rankLine.innerHTML = '';
+      (s.rank.segments || []).forEach(seg => {
+        const span = document.createElement('span');
+        span.className = 'seg';
+        span.textContent = seg.t;
+        span.style.color = COLORS[seg.c] || '#fff';
+        rankLine.appendChild(span);
+      });
+      onlineLine.textContent = (s.online ? '在线 · ' : '离线 · ') + (s.activity || '');
+      const bw = s.bedwars || {};
+      const rows = [
+        ['Stars', bw.stars],
+        ['Kills', bw.kills],
+        ['Deaths', bw.deaths],
+        ['KDR', bw.kdr],
+        ['Final Kills', bw.final_kills],
+        ['Final Deaths', bw.final_deaths],
+        ['FKDR', bw.fkdr],
+        ['Wins', bw.wins],
+        ['Losses', bw.losses],
+        ['Beds Broken', bw.beds_broken],
+      ];
+      stats.innerHTML = rows.map(([k,v]) => `<div><span style="color:var(--muted)">${k}</span> · <b>${v}</b></div>`).join('');
+    }
+
+    async function loadConfig() {
+      const res = await fetch('/supermini/api/hypixel/config', { credentials: 'same-origin' });
+      if (res.status === 401) { location.href = '/supermini/login'; return; }
+      const data = await res.json();
+      document.getElementById('username').value = data.username || '';
+      document.getElementById('cfgMeta').textContent =
+        (data.api_key_set ? ('Key: ' + data.api_key_masked) : 'Key: 未设置') +
+        (data.uuid ? (' · uuid ' + data.uuid) : '');
+    }
+
+    async function loadSummary(force) {
+      const url = force ? '/supermini/api/hypixel/refresh' : '/supermini/api/hypixel';
+      const res = await fetch(url, {
+        method: force ? 'POST' : 'GET',
+        credentials: 'same-origin',
+      });
+      if (res.status === 401) { location.href = '/supermini/login'; return; }
+      const data = await res.json();
+      paintSummary(data);
+      return data;
+    }
+
+    document.getElementById('save').onclick = async () => {
+      setStatus('保存中…');
+      const fd = new FormData();
+      fd.append('username', document.getElementById('username').value.trim());
+      fd.append('api_key', document.getElementById('apiKey').value.trim());
+      const res = await fetch('/supermini/api/hypixel/config', {
+        method: 'POST', body: fd, credentials: 'same-origin',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setStatus('失败: ' + (data.detail || res.status));
+        return;
+      }
+      document.getElementById('apiKey').value = '';
+      setStatus('已保存');
+      await loadConfig();
+      paintSummary(data.summary);
+    };
+
+    document.getElementById('refresh').onclick = async () => {
+      setStatus('刷新中…');
+      const data = await loadSummary(true);
+      setStatus(data && data.ok ? '已刷新' : ('失败: ' + (data && data.error)));
+    };
+
+    (async () => {
+      await loadConfig();
+      await loadSummary(false);
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+## SuperMini Android SDK location (machine-specific)
+sdk.dir=C\:\\Android\\sdk
+
+## Companion hub — same values as desktop_device/secrets.h
+supermini.hub=http://YOUR_HUB
+supermini.apiKey=YOUR_SUPERMINI_PASSWORD

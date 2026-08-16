@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SuperMini 图床</title>
+  <style>
+    :root {
+      --bg0: #0e1412;
+      --bg1: #17201c;
+      --ink: #e8f0ea;
+      --muted: #8aa094;
+      --accent: #3ecf8e;
+      --line: #2a3a33;
+      --danger: #e85d5d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(900px 500px at 10% -10%, #1c3a2e 0%, transparent 55%),
+        radial-gradient(700px 400px at 100% 0%, #243048 0%, transparent 50%),
+        linear-gradient(160deg, var(--bg0), var(--bg1));
+    }
+    main {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 40px 20px 80px;
+    }
+    h1 {
+      font-size: clamp(1.8rem, 4vw, 2.6rem);
+      letter-spacing: 0.02em;
+      margin: 0 0 8px;
+    }
+    .sub { color: var(--muted); margin-bottom: 28px; line-height: 1.5; }
+    .panel {
+      border: 1px solid var(--line);
+      background: rgba(10, 16, 14, 0.55);
+      backdrop-filter: blur(8px);
+      padding: 20px;
+      margin-bottom: 28px;
+    }
+    .drop {
+      border: 1.5px dashed var(--line);
+      padding: 28px;
+      text-align: center;
+      color: var(--muted);
+      transition: border-color .15s, background .15s;
+    }
+    .drop.drag {
+      border-color: var(--accent);
+      background: rgba(62, 207, 142, 0.08);
+    }
+    input[type=file] { margin-top: 14px; color: var(--ink); }
+    button {
+      appearance: none;
+      border: 0;
+      background: var(--accent);
+      color: #062016;
+      font-weight: 700;
+      padding: 10px 18px;
+      cursor: pointer;
+      margin-top: 14px;
+    }
+    button.ghost {
+      background: transparent;
+      color: var(--ink);
+      border: 1px solid var(--line);
+      margin-left: 8px;
+    }
+    button.danger {
+      background: transparent;
+      color: var(--danger);
+      border: 1px solid var(--danger);
+      padding: 6px 10px;
+      font-size: 12px;
+      margin-top: 8px;
+      margin-left: 0;
+    }
+    .status { margin-top: 12px; min-height: 1.4em; color: var(--muted); font-size: 14px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 14px;
+    }
+    .card {
+      border: 1px solid var(--line);
+      background: rgba(0,0,0,.25);
+      padding: 10px;
+    }
+    .card img {
+      width: 100%;
+      aspect-ratio: 160 / 116;
+      object-fit: cover;
+      display: block;
+      background: #000;
+    }
+    .card .meta {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      word-break: break-all;
+    }
+    code { color: var(--accent); }
+    #cropModal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      background: rgba(0,0,0,.72);
+      padding: 16px;
+      overflow: auto;
+    }
+    #cropModal.open { display: flex; align-items: flex-start; justify-content: center; }
+    .crop-box {
+      width: min(920px, 100%);
+      margin: 24px auto;
+      background: #101816;
+      border: 1px solid var(--line);
+      padding: 16px;
+    }
+    .crop-box h2 { margin: 0 0 8px; font-size: 1.15rem; }
+    .crop-hint { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+    .stage-wrap {
+      position: relative;
+      width: 100%;
+      max-height: min(70vh, 640px);
+      overflow: auto;
+      background: #000;
+      touch-action: none;
+    }
+    #stage {
+      display: block;
+      max-width: 100%;
+      cursor: default;
+    }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>SuperMini</h1>
+    <p class="sub">宿舍桌面配套中心 · <a href="/supermini/hypixel" style="color:var(--accent)">Hypixel 配置</a>
+      · 图床裁切 <code>160×116</code><br/>API：<code>/supermini/api/images</code>
+      <button type="button" class="ghost" id="logout" style="margin-top:0;padding:6px 10px;font-size:12px;">退出登录</button>
+    </p>
+
+    <section class="panel">
+      <div class="drop" id="drop">
+        <div>拖拽图片到这里，或选择文件（将打开裁切）</div>
+        <input type="file" id="file" accept="image/*" />
+        <div class="status" id="status"></div>
+      </div>
+    </section>
+
+    <section>
+      <h2 style="font-size:1.1rem;margin:0 0 14px;">已上传</h2>
+      <div class="grid" id="grid"></div>
+    </section>
+  </main>
+
+  <div id="cropModal" aria-modal="true" role="dialog">
+    <div class="crop-box">
+      <h2>选择裁切范围</h2>
+      <div class="crop-hint">选框比例固定 <code>160∶116</code>：拖动<strong>四角</strong>调整大小，拖动<strong>框身</strong>移动位置。</div>
+      <div class="stage-wrap">
+        <canvas id="stage"></canvas>
+      </div>
+      <div class="actions">
+        <button type="button" id="cropOk">确认上传</button>
+        <button type="button" class="ghost" id="cropCancel">取消</button>
+      </div>
+      <div class="status" id="cropStatus"></div>
+    </div>
+  </div>
+
+  <script>
+    const OUT_W = 160, OUT_H = 116, ASPECT = OUT_W / OUT_H;
+    const MIN_CROP = 48;
+    const statusEl = document.getElementById('status');
+    const cropStatus = document.getElementById('cropStatus');
+    const grid = document.getElementById('grid');
+    const fileInput = document.getElementById('file');
+    const drop = document.getElementById('drop');
+    const modal = document.getElementById('cropModal');
+    const stage = document.getElementById('stage');
+    const ctx = stage.getContext('2d');
+
+    let srcImg = null;
+    let srcName = 'image.jpg';
+    let viewScale = 1;
+    let crop = { x: 0, y: 0, w: 100, h: 100 };
+    let drag = null;
+
+    function setStatus(t) { statusEl.textContent = t || ''; }
+    function setCropStatus(t) { cropStatus.textContent = t || ''; }
+
+    async function refresh() {
+      const res = await fetch('/supermini/api/images', { cache: 'no-store', credentials: 'same-origin' });
+      if (res.status === 401) { location.href = '/supermini/login'; return; }
+      const data = await res.json();
+      grid.innerHTML = '';
+      (data.images || []).forEach(img => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          <img src="${img.preview}?t=${img.created || Date.now()}" alt="${img.name}" loading="lazy" />
+          <div class="meta">${img.name}<br/>id=${img.id}</div>
+          <button class="danger" data-id="${img.id}">删除</button>
+        `;
+        card.querySelector('button').onclick = async () => {
+          if (!confirm('删除这张图？')) return;
+          await fetch('/supermini/api/images/' + img.id, { method: 'DELETE', credentials: 'same-origin' });
+          refresh();
+        };
+        grid.appendChild(card);
+      });
+      if (!(data.images || []).length) {
+        grid.innerHTML = '<div class="meta">还没有图片，先上传几张吧。</div>';
+      }
+    }
+
+    function fitCropDefault() {
+      const iw = srcImg.naturalWidth, ih = srcImg.naturalHeight;
+      let w, h;
+      if (iw / ih > ASPECT) {
+        h = ih * 0.7;
+        w = h * ASPECT;
+      } else {
+        w = iw * 0.7;
+        h = w / ASPECT;
+      }
+      crop = { x: (iw - w) / 2, y: (ih - h) / 2, w, h };
+      clampCrop();
+    }
+
+    function layoutStage() {
+      if (!srcImg) return;
+      const maxW = Math.min(880, window.innerWidth - 64);
+      const maxH = Math.min(window.innerHeight * 0.65, 640);
+      viewScale = Math.min(maxW / srcImg.naturalWidth, maxH / srcImg.naturalHeight, 1);
+      stage.width = Math.max(1, Math.round(srcImg.naturalWidth * viewScale));
+      stage.height = Math.max(1, Math.round(srcImg.naturalHeight * viewScale));
+      draw();
+    }
+
+    function draw() {
+      if (!srcImg) return;
+      const w = stage.width, h = stage.height;
+      ctx.clearRect(0, 0, w, h);
+      ctx.drawImage(srcImg, 0, 0, w, h);
+
+      const rx = crop.x * viewScale, ry = crop.y * viewScale;
+      const rw = crop.w * viewScale, rh = crop.h * viewScale;
+
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.fillRect(0, 0, w, ry);
+      ctx.fillRect(0, ry + rh, w, h - (ry + rh));
+      ctx.fillRect(0, ry, rx, rh);
+      ctx.fillRect(rx + rw, ry, w - (rx + rw), rh);
+
+      ctx.strokeStyle = '#3ecf8e';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(rx + 1, ry + 1, rw - 2, rh - 2);
+
+      const hs = 12;
+      ctx.fillStyle = '#3ecf8e';
+      [[rx, ry], [rx + rw, ry], [rx, ry + rh], [rx + rw, ry + rh]].forEach(([hx, hy]) => {
+        ctx.fillRect(hx - hs / 2, hy - hs / 2, hs, hs);
+      });
+    }
+
+    function clampCrop() {
+      const iw = srcImg.naturalWidth, ih = srcImg.naturalHeight;
+      let w = Math.max(MIN_CROP, crop.w);
+      let h = w / ASPECT;
+      if (w > iw) { w = iw; h = w / ASPECT; }
+      if (h > ih) { h = ih; w = h * ASPECT; }
+      crop.w = w;
+      crop.h = h;
+      crop.x = Math.min(Math.max(0, crop.x), Math.max(0, iw - crop.w));
+      crop.y = Math.min(Math.max(0, crop.y), Math.max(0, ih - crop.h));
+    }
+
+    function hitHandle(mx, my) {
+      const thr = Math.max(12 / viewScale, 8);
+      const pts = [
+        { name: 'nw', x: crop.x, y: crop.y },
+        { name: 'ne', x: crop.x + crop.w, y: crop.y },
+        { name: 'sw', x: crop.x, y: crop.y + crop.h },
+        { name: 'se', x: crop.x + crop.w, y: crop.y + crop.h },
+      ];
+      for (const p of pts) {
+        if (Math.abs(mx - p.x) <= thr && Math.abs(my - p.y) <= thr) return p.name;
+      }
+      if (mx >= crop.x && mx <= crop.x + crop.w && my >= crop.y && my <= crop.y + crop.h) return 'move';
+      return null;
+    }
+
+    function pointerToImg(e) {
+      const r = stage.getBoundingClientRect();
+      const sx = stage.width / r.width;
+      const sy = stage.height / r.height;
+      return {
+        x: ((e.clientX - r.left) * sx) / viewScale,
+        y: ((e.clientY - r.top) * sy) / viewScale,
+      };
+    }
+
+    function resizeCorner(mode, px, py, c0) {
+      let ax, ay;
+      if (mode === 'se') { ax = c0.x; ay = c0.y; }
+      else if (mode === 'sw') { ax = c0.x + c0.w; ay = c0.y; }
+      else if (mode === 'ne') { ax = c0.x; ay = c0.y + c0.h; }
+      else { ax = c0.x + c0.w; ay = c0.y + c0.h; }
+
+      const dw = Math.abs(px - ax);
+      const dh = Math.abs(py - ay);
+      let w = Math.max(dw, dh * ASPECT);
+      let h = w / ASPECT;
+
+      let x, y;
+      if (mode === 'se') { x = ax; y = ay; }
+      else if (mode === 'sw') { x = ax - w; y = ay; }
+      else if (mode === 'ne') { x = ax; y = ay - h; }
+      else { x = ax - w; y = ay - h; }
+
+      crop = { x, y, w, h };
+      clampCrop();
+    }
+
+    stage.addEventListener('pointerdown', e => {
+      if (!srcImg) return;
+      stage.setPointerCapture(e.pointerId);
+      const p = pointerToImg(e);
+      const mode = hitHandle(p.x, p.y);
+      if (!mode) return;
+      drag = { mode, x: p.x, y: p.y, crop: { ...crop } };
+      stage.style.cursor = mode === 'move' ? 'move' : 'nwse-resize';
+    });
+    stage.addEventListener('pointermove', e => {
+      if (!srcImg) return;
+      const p = pointerToImg(e);
+      if (!drag) {
+        const h = hitHandle(p.x, p.y);
+        stage.style.cursor = !h ? 'default' : (h === 'move' ? 'move' : 'nwse-resize');
+        return;
+      }
+      if (drag.mode === 'move') {
+        crop.x = drag.crop.x + (p.x - drag.x);
+        crop.y = drag.crop.y + (p.y - drag.y);
+        clampCrop();
+      } else {
+        resizeCorner(drag.mode, p.x, p.y, drag.crop);
+      }
+      draw();
+    });
+    stage.addEventListener('pointerup', () => { drag = null; });
+    stage.addEventListener('pointercancel', () => { drag = null; });
+
+    function openCrop(file) {
+      const url = URL.createObjectURL(file);
+      srcName = file.name || 'image.jpg';
+      const img = new Image();
+      img.onload = () => {
+        srcImg = img;
+        URL.revokeObjectURL(url);
+        fitCropDefault();
+        modal.classList.add('open');
+        layoutStage();
+        setCropStatus('拖动四角调整大小，拖动框身移动位置');
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        setStatus('无法读取图片');
+      };
+      img.src = url;
+    }
+
+    function closeCrop() {
+      modal.classList.remove('open');
+      srcImg = null;
+      fileInput.value = '';
+      setCropStatus('');
+    }
+
+    async function exportAndUpload() {
+      if (!srcImg) return;
+      setCropStatus('导出并上传中…');
+      const out = document.createElement('canvas');
+      out.width = OUT_W;
+      out.height = OUT_H;
+      const octx = out.getContext('2d');
+      octx.imageSmoothingEnabled = true;
+      octx.imageSmoothingQuality = 'high';
+      octx.drawImage(srcImg, crop.x, crop.y, crop.w, crop.h, 0, 0, OUT_W, OUT_H);
+      const blob = await new Promise(res => out.toBlob(res, 'image/jpeg', 0.92));
+      if (!blob) {
+        setCropStatus('导出失败');
+        return;
+      }
+      const fd = new FormData();
+      fd.append('file', blob, srcName.replace(/\.\w+$/, '') + '_crop.jpg');
+      fd.append('pre_cropped', '1');
+      const res = await fetch('/supermini/api/images', { method: 'POST', body: fd, credentials: 'same-origin' });
+      if (res.status === 401) { location.href = '/supermini/login'; return; }
+      if (!res.ok) {
+        setCropStatus('失败: ' + await res.text());
+        return;
+      }
+      setStatus('上传完成');
+      closeCrop();
+      refresh();
+    }
+
+    function onFiles(files) {
+      if (!files || !files.length) return;
+      openCrop(files[0]);
+    }
+
+    fileInput.addEventListener('change', () => onFiles(fileInput.files));
+    drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag'); });
+    drop.addEventListener('dragleave', () => drop.classList.remove('drag'));
+    drop.addEventListener('drop', e => {
+      e.preventDefault();
+      drop.classList.remove('drag');
+      onFiles(e.dataTransfer.files);
+    });
+    document.getElementById('cropCancel').onclick = closeCrop;
+    document.getElementById('cropOk').onclick = exportAndUpload;
+    window.addEventListener('resize', () => { if (srcImg) layoutStage(); });
+
+    document.getElementById('logout').onclick = async () => {
+      await fetch('/supermini/api/logout', { method: 'POST', credentials: 'same-origin' });
+      location.href = '/supermini/login';
+    };
+    refresh();
+  </script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+# Secrets and local machine paths — never commit
+desktop_device/secrets.h
+watch_proxy/local.properties
+server_deploy/.env
+server_deploy/data/
+server_deploy/_tunnel_dropin.conf
+
+# One-off ops scripts (SSH passwords / hostnames)
+/_*.py
+
+# Android build
+watch_proxy/.gradle/
+watch_proxy/**/build/
+*.apk
+*.ap_
+*.aab
+*.keystore
+*.jks
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Arduino / editor
+.arduino/
+*.local.json
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SuperMini</title>
+  <style>
+    :root {
+      --bg0: #0e1412;
+      --bg1: #17201c;
+      --ink: #e8f0ea;
+      --muted: #8aa094;
+      --accent: #3ecf8e;
+      --line: #2a3a33;
+      --danger: #e85d5d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(700px 400px at 20% 0%, #1c3a2e 0%, transparent 55%),
+        linear-gradient(160deg, var(--bg0), var(--bg1));
+    }
+    form {
+      width: min(360px, calc(100vw - 32px));
+      border: 1px solid var(--line);
+      background: rgba(10, 16, 14, 0.7);
+      padding: 28px 22px;
+    }
+    h1 { margin: 0 0 6px; font-size: 1.5rem; }
+    p { margin: 0 0 18px; color: var(--muted); font-size: 14px; }
+    input[type=password] {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid var(--line);
+      background: #0a100e;
+      color: var(--ink);
+      font-size: 16px;
+    }
+    button {
+      margin-top: 14px;
+      width: 100%;
+      border: 0;
+      background: var(--accent);
+      color: #062016;
+      font-weight: 700;
+      padding: 12px;
+      cursor: pointer;
+    }
+    .err { min-height: 1.3em; margin-top: 10px; color: var(--danger); font-size: 13px; }
+  </style>
+</head>
+<body>
+  <form id="f" autocomplete="current-password">
+    <h1>SuperMini</h1>
+    <p>私密图床，请输入密码</p>
+    <input id="pw" type="password" name="password" placeholder="密码" required autofocus />
+    <button type="submit">进入</button>
+    <div class="err" id="err"></div>
+  </form>
+  <script>
+    document.getElementById('f').onsubmit = async (e) => {
+      e.preventDefault();
+      const err = document.getElementById('err');
+      err.textContent = '';
+      const fd = new FormData();
+      fd.append('password', document.getElementById('pw').value);
+      const res = await fetch('/supermini/api/login', { method: 'POST', body: fd, credentials: 'same-origin' });
+      if (!res.ok) {
+        err.textContent = '密码错误';
+        return;
+      }
+      location.href = '/supermini/';
+    };
+  </script>
+</body>
+</html>
